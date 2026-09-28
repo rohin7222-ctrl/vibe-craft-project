@@ -1,4 +1,4 @@
-export type AttendanceStatus = 'safe' | 'warning' | 'danger' | 'detention';
+export type AttendanceStatus = 'safe' | 'warning' | 'danger' | 'detention' | 'pending';
 
 export type SubjectIconType = 
   | 'data-structures' 
@@ -13,6 +13,7 @@ export interface SubjectInput {
   id: string;
   name: string;
   currentPercentage: number;
+  isEntered?: boolean;
 }
 
 export interface SubjectPrediction extends SubjectInput {
@@ -31,6 +32,8 @@ export interface SubjectPrediction extends SubjectInput {
   projectedPercentage?: number;
   odCredit?: number;
   sickDeduction?: number;
+  consecutiveClassesNeeded?: number;
+  immediateBunkableClasses?: number;
 }
 
 export interface SimulationSettings {

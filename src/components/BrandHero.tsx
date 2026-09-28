@@ -40,13 +40,14 @@ export const BrandHero: React.FC<BrandHeroProps> = ({
 
         {/* Section Pill & Layout Controls */}
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          {/* Prominent Return to Room Booking Page Button */}
           <Link
             href="/locator"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 shadow-2xs transition-all cursor-pointer group"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black shadow-md shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 cursor-pointer group"
           >
-            <MapPin className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-            <span>Free Class Locator</span>
-            <span className="text-[9px] uppercase px-1.5 py-0.2 bg-emerald-600 text-white rounded-full font-black">Round 2</span>
+            <MapPin className="w-4 h-4 text-emerald-200 group-hover:scale-110 transition-transform" />
+            <span>Room Booking &amp; Map</span>
+            <span className="text-[9px] uppercase px-2 py-0.5 bg-white/20 text-white rounded-full font-black">Round 2</span>
           </Link>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-2xs">

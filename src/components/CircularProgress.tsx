@@ -42,6 +42,11 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       bg: '#fecaca',     // red-200
       text: 'text-red-800',
     },
+    pending: {
+      stroke: '#94a3b8', // slate-400
+      bg: '#f1f5f9',     // slate-100
+      text: 'text-slate-600',
+    },
   };
 
   const colors = colorMap[status] || colorMap.safe;

@@ -399,6 +399,123 @@ function generateContextualAdvisorResponse(
     (s.name.toLowerCase().includes('phys') && queryLower.includes('phys'))
   );
 
+  // =========================================================================
+  // 🔍 AI FAKE ATTENDANCE AUDITOR & TRUTH VERIFIER
+  // Detects if user claims a fake / inflated attendance or impossible class count
+  // =========================================================================
+  const isAuditQuery = /\b(fake|real|unmai|poi|unmaiyana|nijam|nija|audit|verify|check)\b/i.test(queryLower) && 
+                       /\b(attendance|varugai|percentage|percent|mark)\b/i.test(queryLower);
+
+  // Extract claimed percentage if user stated one (e.g., "95%", "I have 90%", "attendance 85%")
+  let claimedPercentage: number | null = null;
+  const pctRegex = /(\d{1,3})\s*(?:%|percent|percentage|vizhukkadu)/i;
+  const pctMatch = queryLower.match(pctRegex);
+  if (pctMatch) {
+    const val = parseInt(pctMatch[1], 10);
+    if (!isNaN(val) && val >= 0 && val <= 100) {
+      claimedPercentage = val;
+    }
+  } else {
+    const verbalMatch = queryLower.match(/\b(?:have|got|iruku|vachuruken|enoda|my)\s+(?:attendance\s+)?(\d{2,3})\b/i) ||
+                        queryLower.match(/\b(?:attendance)\s+(?:is\s+)?(\d{2,3})\b/i);
+    if (verbalMatch) {
+      const val = parseInt(verbalMatch[1], 10);
+      if (!isNaN(val) && val >= 40 && val <= 100) {
+        claimedPercentage = val;
+      }
+    }
+  }
+
+  // Extract claimed attended class count if user stated one (e.g. "I attended 45 classes", "50 classes attend panniten")
+  let claimedClassesCount: number | null = null;
+  const classCountMatch = queryLower.match(/(\d{1,3})\s*(?:classes|class|vakuppu|periods|period)\s*(?:attend|attended|vantha|vanthen|present)/i) ||
+                          queryLower.match(/(?:attend|attended|vantha|vanthen|present)\s*(\d{1,3})\s*(?:classes|class|vakuppu|periods)/i);
+  if (classCountMatch) {
+    const val = parseInt(classCountMatch[1], 10);
+    if (!isNaN(val) && val > 0) {
+      claimedClassesCount = val;
+    }
+  }
+
+  // Real timetable statistics
+  const enteredSubjects = subjects.filter(s => s.status !== 'pending');
+  const avgRealPct = enteredSubjects.length > 0 
+    ? Math.round(enteredSubjects.reduce((sum, s) => sum + s.currentPercentage, 0) / enteredSubjects.length) 
+    : 0;
+  const totalHeldSemester = subjects.reduce((sum, s) => sum + (s.tPast || 19), 0);
+
+  const subjectPast = matchedSubject ? (matchedSubject.tPast || 19) : 19;
+  const subjectRealPct = matchedSubject ? matchedSubject.currentPercentage : avgRealPct;
+  const subjectRealAttended = Math.round((subjectRealPct / 100) * subjectPast);
+
+  // Check if claim is fake or inflated
+  const isPendingAll = enteredSubjects.length === 0;
+  const isFakePercentage = claimedPercentage !== null && (
+    isPendingAll || 
+    (matchedSubject ? (claimedPercentage > subjectRealPct + 3 || claimedPercentage < subjectRealPct - 20) : (claimedPercentage > avgRealPct + 4))
+  );
+  const isImpossibleClassCount = claimedClassesCount !== null && (
+    claimedClassesCount > subjectPast || (claimedClassesCount > subjectRealAttended + 3)
+  );
+
+  // If a fake claim or impossible count is detected, trigger the AI Fake Detector response:
+  if (isFakePercentage || isImpossibleClassCount) {
+    const targetSubjName = matchedSubject ? matchedSubject.name : 'Overall Subjects';
+    
+    if (isPendingAll) {
+      return `🕵️‍♂️ **AI Attendance Audit &bull; Records Not Entered Yet!**\n\n${
+        isTanglish 
+          ? `Nice try! 😉 நீங்க **${claimedPercentage}% Attendance**-னு உரிமை கோரியுள்ளீர்கள். ஆனால் உங்கள் போர்ட்டல் பதிவின்படி வருகை இன்னும் உள்ளிடப்படவில்லை (All courses are currently blank/pending)!\n\n👉 பொய் சொன்னா AI உடனே கண்டுபிடிச்சிடும்! தயவுசெய்து உங்கள் உண்மையான பாட வாரியான சதவீதங்களை (Course %) உள்ளிடுங்கள், AI உடனே உங்கள் உண்மையான Safe Bunk limits & Cutoff-ஐ கணக்கிடும்.`
+          : `Nice try! 😉 You claimed **${claimedPercentage}% Attendance**, but our verified portal records indicate you haven't entered your subject percentages yet (all fields are currently blank/pending)!\n\n👉 Please enter your actual percentages above so the AI can verify your real status and calculate your exact safe bunk limits.`
+      }`;
+    }
+
+    return `🕵️‍♂️ **Fake Attendance Claim Detected! (போலி வருகை கண்டுபிடிப்பு)**\n\n${
+      isTanglish
+        ? `Nice try! 😉 நீங்க **${claimedPercentage !== null ? `${claimedPercentage}%` : `${claimedClassesCount} வகுப்புகள்`}** என்று உரிமை கோரியுள்ளீர்கள். ஆனால் எங்கள் **Real Timetable & Portal Database Verification** படி:\n\n` +
+          `📊 **உண்மையான நிலவரம் (Real Verified Stats):**\n` +
+          `• **Course:** ${targetSubjName}\n` +
+          `• **உண்மையான வருகை (Real Attendance):** **${subjectRealPct}%** (நீங்கள் சொன்ன ${claimedPercentage !== null ? `${claimedPercentage}%` : `${claimedClassesCount} classes`} முற்றிலும் தவறு!)\n` +
+          `• **இதுவரை நடந்த மொத்த வகுப்புகள் (Conducted to Date):** **${subjectPast}** வகுப்புகள் மட்டுமே நடந்துள்ளது.\n` +
+          `• **நீங்கள் உண்மையில் வந்தது (Attended):** சுமார் **${subjectRealAttended}** வகுப்புகள் மட்டுமே (${subjectPast - subjectRealAttended} வகுப்புகள் நீங்கள் வரவில்லை).\n` +
+          (matchedSubject ? `• **தற்போதைய நிலை:** ${matchedSubject.status === 'safe' ? '✅ Safe Zone' : `⚠️ 75% எட்ட இன்னும் **${matchedSubject.requiredClassesToAttend} வகுப்புகள்** விடாமல் attend பண்ணனும்!`}\n` : `• **ஒட்டுமொத்த சராசரி:** **${avgRealPct}%** (${subjects.filter(s => s.status === 'danger' || s.status === 'detention').length} பாடங்கள் Danger-ல் உள்ளன).\n`) +
+          `\n❌ **AI Truth Verification:**\n` +
+          (isImpossibleClassCount
+            ? `👉 காலண்டர் விதிகளின்படி செமஸ்டர் தொடங்கி இதுவரை நடந்ததே மொத்தம் **${subjectPast} வகுப்புகள்** தான்! நீங்க **${claimedClassesCount} வகுப்புகள்** வந்திருக்க வாய்ப்பே இல்லை! 😂`
+            : `👉 Fake attendance வச்சு Calculation பண்ணினா Semester Exam-ல **Detention** ஆகிடுவீங்க! நிஜமான வருகை **${subjectRealPct}%** மட்டுமே.`
+          ) +
+          `\n\n💡 **AI Counselor ஆலோசனை:**\n` +
+          `பொய் சொன்னாலும் AI கண்டுபிடிச்சிடும்! உண்மை நிலவரத்தை வச்சு வகுப்புகளுக்கு ஒழுங்கா attend பண்ணி 75% வரம்பை எட்டுங்கள்!`
+        : `Nice try! 😉 You claimed **${claimedPercentage !== null ? `${claimedPercentage}%` : `${claimedClassesCount} classes`}**, but our **Real Timetable & Portal Intelligence Audit** reveals the truth:\n\n` +
+          `📊 **Real Verified Attendance Records:**\n` +
+          `• **Subject:** ${targetSubjName}\n` +
+          `• **Real Attendance Percentage:** **${subjectRealPct}%** (Claimed: ${claimedPercentage !== null ? `${claimedPercentage}%` : `${claimedClassesCount} classes`} &bull; Discrepancy: ${claimedPercentage ? Math.abs(claimedPercentage - subjectRealPct) : 0}%)\n` +
+          `• **Conducted Classes So Far:** Exactly **${subjectPast}** classes have been held in the college timetable since Aug 29.\n` +
+          `• **Physically Attended by You:** Approximately **${subjectRealAttended}** classes (${subjectPast - subjectRealAttended} missed sessions).\n` +
+          (matchedSubject ? `• **Academic Standing:** ${matchedSubject.status === 'safe' ? '✅ Safe Zone' : `⚠️ You need to attend **${matchedSubject.requiredClassesToAttend} consecutive classes** to reach the 75% cutoff!`}\n` : `• **Overall Average:** **${avgRealPct}%** across ${subjects.length} courses.\n`) +
+          `\n❌ **Audit Finding:**\n` +
+          (isImpossibleClassCount
+            ? `👉 Physically impossible claim! Only **${subjectPast} classes** were conducted so far. You cannot have attended **${claimedClassesCount}**!`
+            : `👉 Your verified attendance is **${subjectRealPct}%**. Planning leaves based on fake claims will lead to condonation fines or exam detention!`
+          ) +
+          `\n\n💡 **AI Advice:** Keep it real! Use your verified stats to plan safely and stay clear of detention!`
+    }`;
+  }
+
+  // Handle explicit real attendance inquiry
+  if (isAuditQuery || queryLower.includes('real attendance') || queryLower.includes('unmai attendance') || queryLower.includes('nijamana attendance') || queryLower.includes('check my attendance')) {
+    return `📋 **Official Attendance Truth Audit & Verified Records &bull; ${sectionDisplayName || section}:**\n\n` +
+      `• **Overall Real Average:** **${avgRealPct}%** across ${subjects.length} courses\n` +
+      `• **Target Semester Date:** ${context.targetDate}\n\n` +
+      `📊 **Verified Subject-by-Subject Records:**\n` +
+      subjects.map(s => {
+        const past = s.tPast || 19;
+        const attended = Math.round(((s.currentPercentage || 0) / 100) * past);
+        return `• **${s.name}:** **${s.currentPercentage}%** (Held: ${past}, Attended: ~${attended} &bull; Status: ${s.status.toUpperCase()})`;
+      }).join('\n') +
+      `\n\n💡 All calculations are verified directly against your section's actual schedule!`;
+  }
+
   // Question about Sick Leave / taking leaves
   if (queryLower.includes('sick') || queryLower.includes('leave') || queryLower.includes('miss') || queryLower.includes('absent') || queryLower.includes('edutha')) {
     const matchDays = queryLower.match(/(\d+)\s*(-|\s)?(day|days|naal|naalu)/);

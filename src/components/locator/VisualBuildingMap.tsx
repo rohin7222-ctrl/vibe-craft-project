@@ -30,6 +30,7 @@ interface VisualBuildingMapProps {
   selectedDay: DayOfWeek;
   selectedPeriod: number;
   onSelectRoom: (room: RoomSchedule) => void;
+  onInspectSchedule?: (room: RoomSchedule) => void;
 }
 
 export const VisualBuildingMap: React.FC<VisualBuildingMapProps> = ({
@@ -37,6 +38,7 @@ export const VisualBuildingMap: React.FC<VisualBuildingMapProps> = ({
   selectedDay,
   selectedPeriod,
   onSelectRoom,
+  onInspectSchedule,
 }) => {
   const periodIndex = selectedPeriod - 1;
   const currentTiming = PERIOD_TIMINGS[periodIndex];
@@ -300,14 +302,24 @@ export const VisualBuildingMap: React.FC<VisualBuildingMapProps> = ({
                       </div>
 
                       {/* Bottom Action Footer */}
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-600 group-hover:text-emerald-700">
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
-                          {room.room.includes('Lab') ? '45 Workstations' : '65 Desks'}
-                        </span>
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-600 gap-2">
+                        {onInspectSchedule && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onInspectSchedule(room);
+                            }}
+                            className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black text-slate-700 hover:text-emerald-800 bg-slate-100 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+                            title="Inspect Full Weekly Schedule & Golden Windows"
+                          >
+                            <Sparkles className="w-3 h-3 text-emerald-600" />
+                            <span>Inspect Schedule</span>
+                          </button>
+                        )}
 
-                        <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-emerald-700 group-hover:underline">
-                          <span>{isFree ? 'Open Live Countdown' : 'View Timetable'}</span>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-emerald-700 group-hover:underline ml-auto">
+                          <span>{isFree ? 'Live Countdown' : 'Room Details'}</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </span>
                       </div>

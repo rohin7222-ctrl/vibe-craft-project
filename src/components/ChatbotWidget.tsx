@@ -63,6 +63,19 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
     }
   }, [messages, isOpen]);
 
+  // Support closing modal via Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   // Construct current state context to inject into every API request
   const buildCurrentContext = () => ({
     section,
@@ -84,6 +97,7 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
       statusText: s.statusText,
       odCredit: s.odCredit || 0,
       sickDeduction: s.sickDeduction || 0,
+      isEntered: s.isEntered !== false && s.status !== 'pending',
     })),
   });
 
@@ -141,9 +155,9 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
   };
 
   const quickPrompts = [
+    { label: '🕵️ Audit Real Attendance', query: 'en real attendance enna? fake ah illama nija stats sollu' },
+    { label: '🧪 Test Fake Claim (95%)', query: 'Enaku 95% attendance iruku, leave edukalama?' },
     { label: '📉 Leave Drop & Mark Loss', query: 'Leave eduka poren, percentage evlo korayum? Mark reduce aguma?' },
-    { label: '🛠️ Regain Blueprint', query: 'Lost attendance and mark regain panna enna visayangal seiyanum?' },
-    { label: '🚨 Inaction Severe Penalties', query: 'Leave eduthutu ethuvum seyalati ethelam loss agum?' },
     { label: '🎖️ 2-Day OD Boost', query: '2 days OD edutha percentage evlo yerum?' },
     { label: '🛡️ Safe Missable Classes', query: 'How many classes can I safely bunk without detention?' },
   ];
@@ -291,30 +305,39 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
         </div>
       )}
 
+      {/* Backdrop overlay on mobile / click outside to close */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-2xs transition-opacity cursor-pointer"
+          onClick={() => setIsOpen(false)}
+          title="Click outside to close chat"
+        />
+      )}
+
       {/* Floating Chat Modal */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-full max-w-[390px] sm:max-w-[470px] h-[610px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-fadeIn">
+        <div className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-24px)] sm:w-full max-w-[470px] h-[85vh] max-h-[620px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-fadeIn">
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shadow-sm flex-shrink-0">
                 <Bot className="w-5 h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-extrabold text-sm tracking-tight">Academic Advisor AI</h3>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="font-extrabold text-sm tracking-tight truncate">Academic Advisor AI</h3>
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-500/30 flex-shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                     Live Context
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300 truncate max-w-[240px]">
+                <p className="text-[11px] text-slate-300 truncate max-w-[200px] sm:max-w-[240px]">
                   {sectionDisplayName} • OD: {simulation.odDays}d, Sick: {simulation.sickDays}d
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setMessages([{
@@ -323,16 +346,20 @@ export const ChatbotWidget: React.FC<ChatbotWidgetProps> = ({
                   content: `Conversation reset. I am ready to calculate your attendance drop, marks reduction, and recovery strategy for **${sectionDisplayName || section}**.\n\nAsk me anything!`,
                 }])}
                 title="Reset conversation"
-                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                className="text-slate-300 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
               </button>
+
+              {/* High Contrast Prominent Close Button */}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                title="Close Advisor (Esc)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/20 hover:bg-rose-600 text-white font-black text-xs transition-all cursor-pointer shadow-sm active:scale-95 border border-white/20"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span>Close</span>
               </button>
             </div>
           </div>

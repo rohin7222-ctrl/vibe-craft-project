@@ -21,6 +21,7 @@ import { MasterMatrixView } from '@/components/locator/MasterMatrixView';
 import { RoomDetailModal } from '@/components/locator/RoomDetailModal';
 import { VisualBuildingMap } from '@/components/locator/VisualBuildingMap';
 import { RoomCountdownModal } from '@/components/locator/RoomCountdownModal';
+import { ScheduleInspectorModal } from '@/components/locator/ScheduleInspectorModal';
 import { SearchX } from 'lucide-react';
 
 export default function FreeClassLocatorPage() {
@@ -38,6 +39,7 @@ export default function FreeClassLocatorPage() {
 
   // Modal inspection state
   const [selectedRoomModal, setSelectedRoomModal] = useState<RoomSchedule | null>(null);
+  const [scheduleInspectRoom, setScheduleInspectRoom] = useState<RoomSchedule | null>(null);
 
   // Available unique floors
   const availableFloors = useMemo(() => {
@@ -174,6 +176,7 @@ export default function FreeClassLocatorPage() {
             selectedDay={selectedDay}
             selectedPeriod={selectedPeriod}
             onSelectRoom={setSelectedRoomModal}
+            onInspectSchedule={setScheduleInspectRoom}
           />
         ) : viewMode === 'cards' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -215,12 +218,24 @@ export default function FreeClassLocatorPage() {
       </div>
 
       {/* 8. Live Countdown & Squad Share Modal */}
-      <RoomCountdownModal
-        room={selectedRoomModal}
-        selectedDay={selectedDay}
-        selectedPeriod={selectedPeriod}
-        onClose={() => setSelectedRoomModal(null)}
-      />
+      {selectedRoomModal && (
+        <RoomCountdownModal
+          room={selectedRoomModal}
+          selectedDay={selectedDay}
+          selectedPeriod={selectedPeriod}
+          onClose={() => setSelectedRoomModal(null)}
+          onInspectSchedule={setScheduleInspectRoom}
+        />
+      )}
+
+      {/* 9. Full Schedule Inspector Modal (MAX UI/UX) */}
+      {scheduleInspectRoom && (
+        <ScheduleInspectorModal
+          room={scheduleInspectRoom}
+          initialDay={selectedDay}
+          onClose={() => setScheduleInspectRoom(null)}
+        />
+      )}
     </div>
   );
 }

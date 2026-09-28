@@ -11,16 +11,18 @@ import { InputScreen } from '@/components/InputScreen';
 import { DashboardScreen } from '@/components/DashboardScreen';
 import { BrandHero } from '@/components/BrandHero';
 import { ChatbotWidget } from '@/components/ChatbotWidget';
+import Link from 'next/link';
+import { MapPin } from 'lucide-react';
 
-// Helper to extract default subject inputs from a section in TIMETABLE_DATA
+// Helper to extract clean initial subject inputs from a section in TIMETABLE_DATA (no hardcoded low percentages)
 const getInitialSubjectsForSection = (sectionKey: string): SubjectInput[] => {
   const schedule = TIMETABLE_DATA[sectionKey] || TIMETABLE_DATA['IV_ECE_B'];
-  const defaultPercentages = [65, 72, 82, 70, 78, 60, 85, 75, 68, 74];
   
   return Object.keys(schedule).map((name, index) => ({
     id: `subj-${index + 1}`,
     name,
-    currentPercentage: defaultPercentages[index % defaultPercentages.length],
+    currentPercentage: 0,
+    isEntered: false,
   }));
 };
 
@@ -51,7 +53,9 @@ export default function Home() {
   ) => {
     const userPercentages: Record<string, number> = {};
     for (const s of currentSubjects) {
-      userPercentages[s.name] = s.currentPercentage;
+      if (s.isEntered) {
+        userPercentages[s.name] = s.currentPercentage;
+      }
     }
 
     const metrics = calculateAttendanceMetrics(
@@ -81,6 +85,9 @@ export default function Home() {
       bunkableClasses: m.bunkableClasses,
       odCredit: m.odCredit,
       sickDeduction: m.sickDeduction,
+      consecutiveClassesNeeded: m.consecutiveClassesNeeded,
+      immediateBunkableClasses: m.immediateBunkableClasses,
+      isEntered: m.isEntered,
     }));
 
     setPredictions(formattedPredictions);
@@ -108,7 +115,11 @@ export default function Home() {
 
     try {
       const userPercentages: Record<string, number> = {};
-      subjects.forEach(s => { userPercentages[s.name] = s.currentPercentage; });
+      subjects.forEach(s => { 
+        if (s.isEntered) {
+          userPercentages[s.name] = s.currentPercentage; 
+        }
+      });
 
       const response = await fetch('/api/predict', {
         method: 'POST',
@@ -143,6 +154,9 @@ export default function Home() {
           bunkableClasses: m.bunkableClasses,
           odCredit: m.odCredit,
           sickDeduction: m.sickDeduction,
+          consecutiveClassesNeeded: m.consecutiveClassesNeeded,
+          immediateBunkableClasses: m.immediateBunkableClasses,
+          isEntered: m.isEntered,
         }));
         setPredictions(formatted);
         setTotalClassesRemaining(data.totalClassesRemainingSemester);
@@ -254,6 +268,26 @@ export default function Home() {
             />
           </div>
         )}
+      </div>
+
+      {/* Floating Return to Room Booking Page Button */}
+      <div className="fixed bottom-6 left-6 z-40">
+        <Link
+          href="/locator"
+          className="group flex items-center gap-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white px-4 py-3 rounded-full shadow-2xl shadow-emerald-500/35 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-emerald-400/40"
+        >
+          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <MapPin className="w-4 h-4 text-white animate-pulse" />
+          </div>
+          <div className="flex flex-col text-left pr-1">
+            <span className="text-xs font-black tracking-wide leading-tight">
+              Room Booking &amp; Map
+            </span>
+            <span className="text-[10px] text-emerald-100 font-semibold leading-tight">
+              Return to Vacant Rooms ➔
+            </span>
+          </div>
+        </Link>
       </div>
 
       {/* Floating Attendance Advisor AI Chatbot */}

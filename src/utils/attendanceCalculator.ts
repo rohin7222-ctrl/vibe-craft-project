@@ -26,6 +26,9 @@ export interface SubjectMetric {
   odCredit: number;
   sickDeduction: number;
   maxAttendableFuture: number;
+  consecutiveClassesNeeded?: number;
+  immediateBunkableClasses?: number;
+  isEntered?: boolean;
 }
 
 export interface AttendancePredictionResult {
@@ -42,6 +45,7 @@ export interface AttendancePredictionResult {
     warning: number;
     danger: number;
     detention: number;
+    pending?: number;
   };
 }
 
@@ -123,6 +127,7 @@ export function calculateAttendanceMetrics(
     warning: 0,
     danger: 0,
     detention: 0,
+    pending: 0,
   };
 
   const subjects: SubjectMetric[] = Object.keys(schedule).map((subjName, index) => {
@@ -134,13 +139,12 @@ export function calculateAttendanceMetrics(
     totalClassesRemainingTarget += tFuture;
     totalClassesRemainingSemester += tSemRemaining;
 
-    // Current Percentage
-    const currentPercentage = userPercentages[subjName] !== undefined
-      ? userPercentages[subjName]
-      : [65, 72, 82, 70, 78, 60, 85, 75][index % 8];
+    // Check if percentage has been entered by the user
+    const isEntered = userPercentages[subjName] !== undefined && userPercentages[subjName] !== null;
+    const currentPercentage = isEntered ? Math.min(100, Math.max(0, userPercentages[subjName])) : 0;
 
     // Estimated attended classes so far
-    const baseAttended = tPast > 0 ? Math.round((currentPercentage / 100) * tPast) : 0;
+    const baseAttended = (isEntered && tPast > 0) ? Math.round((currentPercentage / 100) * tPast) : 0;
 
     // --- LEAVE & OD SIMULATION LOGIC ---
     // Average periods per day for this subject
@@ -159,55 +163,94 @@ export function calculateAttendanceMetrics(
     // Total required attendance count by target date to reach target %
     const requiredOverallAttended = Math.ceil((targetPercentage / 100) * tTotal);
 
-    // Additional future classes student MUST attend
+    // Additional future classes student MUST attend across semester
     const needed = Math.max(0, requiredOverallAttended - effectiveAttended);
 
-    // Max achievable attendance percentage if student attends 100% of available future classes
+    // Maximum achievable attendance percentage if student attends 100% of available future classes
     const maxPossibleAttended = effectiveAttended + maxAttendableFuture;
     const maxAchievable = tTotal > 0
       ? Math.min(100, Math.round((maxPossibleAttended / tTotal) * 100))
       : 100;
 
+    // Remaining future classes student can safely miss / bunk across remaining semester
+    const semesterBunkable = Math.max(0, maxAttendableFuture - needed);
+
+    // If subject attendance has not been entered yet, mark as pending without false detention
+    if (!isEntered) {
+      statusCounts.pending = (statusCounts.pending || 0) + 1;
+      return {
+        id: `subj-${index + 1}`,
+        name: subjName,
+        currentPercentage: 0,
+        targetPercentage,
+        tPast,
+        tFuture,
+        tTotal,
+        attendedClasses: 0,
+        requiredClassesToAttend: 0,
+        bunkableClasses: 0,
+        maxAchievablePercentage: 100,
+        status: 'pending' as AttendanceStatus,
+        statusText: 'Enter your attendance percentage above to calculate targets, bunk limits & streak required.',
+        isIrreversibleDetention: false,
+        iconType: getSubjectIconType(subjName),
+        odCredit: 0,
+        sickDeduction: 0,
+        maxAttendableFuture,
+        consecutiveClassesNeeded: 0,
+        immediateBunkableClasses: 0,
+        isEntered: false,
+      };
+    }
+
+    // Immediate streak needed right now to reach targetPercentage (75%)
+    let streakNeeded = 0;
+    if (currentPercentage < targetPercentage && targetPercentage < 100) {
+      streakNeeded = Math.max(0, Math.ceil((targetPercentage * tPast - 100 * baseAttended) / (100 - targetPercentage)));
+    }
+
+    // Immediate classes that can be bunked right now without dropping below targetPercentage (75%)
+    let immediateBunkable = 0;
+    if (currentPercentage >= targetPercentage && targetPercentage > 0) {
+      immediateBunkable = Math.max(0, Math.floor((100 * baseAttended - targetPercentage * tPast) / targetPercentage));
+    }
+
     const isIrreversible = maxAchievable < targetPercentage || needed > maxAttendableFuture;
 
     let status: AttendanceStatus = 'safe';
     let statusText = 'You are on track! Keep it up.';
-    let bunkable = 0;
+    let bunkable = semesterBunkable;
 
     if (isIrreversible) {
       status = 'detention';
       statusCounts.detention++;
       hasDetentionWarning = true;
+      bunkable = 0;
       if (simulation.sickDays > 0) {
-        statusText = `Detention Alert! Due to ${simulation.sickDays} sick leave(s), max achievable is only ${maxAchievable}%.`;
+        statusText = `🚨 Detention Alert! Due to ${simulation.sickDays} sick day(s), max achievable is only ${maxAchievable}%. Apply for OD immediately!`;
       } else {
-        statusText = `Irreversible Detention! Max achievable attendance is ${maxAchievable}%.`;
+        statusText = `🚨 Irreversible Detention Risk! Max achievable is ${maxAchievable}% (< ${targetPercentage}%). Immediate recovery action needed.`;
       }
-    } else if (needed === 0) {
+    } else if (currentPercentage >= targetPercentage) {
       status = 'safe';
       statusCounts.safe++;
-      bunkable = maxPossibleAttended - requiredOverallAttended;
-      if (odCredit > 0) {
-        statusText = `On Track! (+${odCredit} classes credited via OD). You can safely miss up to ${bunkable} classes.`;
+      const odText = odCredit > 0 ? ` (+${odCredit} classes credited via OD)` : '';
+      if (immediateBunkable > 0 || semesterBunkable > 0) {
+        statusText = `✅ Safe Zone (${currentPercentage}%)! You can bunk up to ${immediateBunkable} class(es) right now, or ${semesterBunkable} classes across the semester${odText}.`;
       } else {
-        statusText = bunkable > 0 
-          ? `You are on track! You can safely miss up to ${bunkable} classes.`
-          : `You are on track! Keep it up.`;
+        statusText = `✅ Safe Zone (${currentPercentage}%)! On track to maintain ${targetPercentage}% cutoff${odText}.`;
       }
+    } else if (currentPercentage >= 65) {
+      status = 'warning';
+      statusCounts.warning++;
+      const odText = odCredit > 0 ? ` (+${odCredit} OD credit)` : '';
+      statusText = `⚠️ Needs Attendance Boost (${currentPercentage}%)! Attend next ${streakNeeded} consecutive class(es) to reach ${targetPercentage}%. Must attend ${needed} of ${maxAttendableFuture} remaining classes${odText}.`;
     } else {
-      // Must attend some future classes
-      const attendanceRatioNeeded = maxAttendableFuture > 0 ? needed / maxAttendableFuture : 1;
-      if (attendanceRatioNeeded >= 0.70 || currentPercentage < targetPercentage) {
-        status = 'danger';
-        statusCounts.danger++;
-        hasDetentionWarning = true;
-      } else {
-        status = 'warning';
-        statusCounts.warning++;
-      }
-
-      const odText = odCredit > 0 ? ` (+${odCredit} credited via OD)` : '';
-      statusText = `You MUST attend ${needed} out of ${maxAttendableFuture} available remaining classes${odText}.`;
+      status = 'danger';
+      statusCounts.danger++;
+      hasDetentionWarning = true;
+      const odText = odCredit > 0 ? ` (+${odCredit} OD credit)` : '';
+      statusText = `🚨 Critical Danger Zone (${currentPercentage}%)! Attend next ${streakNeeded} consecutive class(es) to escape condonation fine. Must attend ${needed} of ${maxAttendableFuture} remaining classes${odText}.`;
     }
 
     return {
@@ -229,6 +272,9 @@ export function calculateAttendanceMetrics(
       odCredit,
       sickDeduction,
       maxAttendableFuture,
+      consecutiveClassesNeeded: streakNeeded,
+      immediateBunkableClasses: immediateBunkable,
+      isEntered: true,
     };
   });
 

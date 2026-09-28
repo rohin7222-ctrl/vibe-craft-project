@@ -37,6 +37,7 @@ interface RoomCountdownModalProps {
   selectedDay: DayOfWeek;
   selectedPeriod: number;
   onClose: () => void;
+  onInspectSchedule?: (room: RoomSchedule) => void;
 }
 
 export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
@@ -44,22 +45,20 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
   selectedDay,
   selectedPeriod,
   onClose,
+  onInspectSchedule,
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [countdownStr, setCountdownStr] = useState<string>('00:00:00');
   const [percentLeft, setPercentLeft] = useState<number>(100);
   const [isWindowExpired, setIsWindowExpired] = useState<boolean>(false);
 
-  // If no room is selected, return null
-  if (!room) return null;
-
   const periodIndex = selectedPeriod - 1;
-  const schedule = room.occupied[selectedDay] || [];
-  const isFree = (schedule[periodIndex] ?? 1) === 0;
+  const schedule = room ? (room.occupied[selectedDay] || []) : [];
+  const isFree = room ? (schedule[periodIndex] ?? 1) === 0 : false;
 
   // Calculate consecutive free periods from currently selected period
-  const consecutiveFree = isFree ? getConsecutiveFreePeriods(room, selectedDay, periodIndex) : 0;
-  const nextFreePeriodIndex = !isFree ? getNextFreePeriodIndex(room, selectedDay, periodIndex) : -1;
+  const consecutiveFree = (room && isFree) ? getConsecutiveFreePeriods(room, selectedDay, periodIndex) : 0;
+  const nextFreePeriodIndex = (room && !isFree) ? getNextFreePeriodIndex(room, selectedDay, periodIndex) : -1;
 
   // The period when the room becomes occupied again
   const lastFreePeriodNumber = periodIndex + consecutiveFree; // 1-based (e.g. if P7 and cons=3, last free is P9)
@@ -72,13 +71,12 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
     : '';
 
   // WhatsApp Squad Pre-filled message
-  // Required format: "📍 Heading to [Room Name]. It's free until [End Time of Free Slot]. Come fast!"
-  const squadShareText = `📍 Heading to ${room.room}. It's free until ${displayEndTime || '04:50 PM'}. Come fast!`;
+  const squadShareText = room ? `📍 Heading to ${room.room}. It's free until ${displayEndTime || '04:50 PM'}. Come fast!` : '';
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(squadShareText)}`;
 
-  // Live JavaScript Countdown Timer (HH:MM:SS)
+  // Live JavaScript Countdown Timer (HH:MM:SS) - Called unconditionally on every render
   useEffect(() => {
-    if (!isFree || consecutiveFree <= 0) {
+    if (!room || !isFree || consecutiveFree <= 0) {
       setCountdownStr('00:00:00');
       return;
     }
@@ -125,7 +123,10 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
     const timerInterval = setInterval(computeTimer, 1000);
 
     return () => clearInterval(timerInterval);
-  }, [isFree, consecutiveFree, lastFreePeriodNumber]);
+  }, [room, isFree, consecutiveFree, lastFreePeriodNumber]);
+
+  // If no room is selected, return null AFTER all hooks are evaluated
+  if (!room) return null;
 
   const handleCopySquadMessage = () => {
     navigator.clipboard?.writeText(squadShareText);
@@ -359,14 +360,30 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
           {/* 4. FULL 5-DAY TIMETABLE MATRIX TABLE */}
           {/* ======================================================== */}
           <div>
-            <div className="flex items-center justify-between mb-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
               <h4 className="text-sm font-black text-slate-900 flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-emerald-600" />
                 <span>Full 5-Day Monday - Friday Schedule</span>
               </h4>
-              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                0 = Free &bull; 1 = Occupied
-              </span>
+              
+              <div className="flex items-center gap-2">
+                {onInspectSchedule && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInspectSchedule(room);
+                      onClose();
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-300 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    <span>Inspect Full Schedule (MAX UI/UX) ➔</span>
+                  </button>
+                )}
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  0 = Free &bull; 1 = Occupied
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white">
@@ -430,17 +447,32 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
             College periods: 09:00 AM - 04:50 PM (50 mins each).
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {onInspectSchedule && (
+              <button
+                type="button"
+                onClick={() => {
+                  onInspectSchedule(room);
+                  onClose();
+                }}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-black transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Inspect Full Schedule</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

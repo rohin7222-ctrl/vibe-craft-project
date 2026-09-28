@@ -12,7 +12,8 @@ import {
   BookOpen,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 
 interface SubjectCardProps {
@@ -39,8 +40,20 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
     }
   };
 
+  const isPending = subject.status === 'pending' || subject.isEntered === false;
+
   const getTheme = (status: AttendanceStatus) => {
     switch (status) {
+      case 'pending':
+        return {
+          cardBorder: 'border-slate-200 hover:border-blue-300 bg-white',
+          iconBox: 'bg-blue-50 text-blue-600',
+          badgeText: 'text-slate-600 bg-slate-100 border-slate-200',
+          barColor: 'bg-slate-200',
+          bannerBg: 'bg-slate-50 text-slate-600 border border-slate-200',
+          label: 'Awaiting %',
+          icon: <Clock className="w-3.5 h-3.5 text-blue-500" />,
+        };
       case 'detention':
         return {
           cardBorder: 'border-red-300 hover:border-red-400 bg-red-50/20',
@@ -108,11 +121,13 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
                 </span>
                 <span className="text-[10px] text-slate-300">•</span>
                 <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${
-                  internalMarks >= 4 
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                    : (internalMarks >= 2 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-rose-50 text-rose-700 border border-rose-200')
+                  isPending
+                    ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                    : internalMarks >= 4 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                      : (internalMarks >= 2 ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-rose-50 text-rose-700 border border-rose-200')
                 }`}>
-                  {internalMarks}/5 Marks
+                  {isPending ? 'Pending' : `${internalMarks}/5 Marks`}
                 </span>
               </div>
             </div>
@@ -127,7 +142,9 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
         {/* Visual Progress Bar with 75% Cutoff Marker */}
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs font-bold mb-1">
-            <span className="text-slate-700">Current: {subject.currentPercentage}%</span>
+            <span className="text-slate-700">
+              {isPending ? 'Current: Awaiting %' : `Current: ${subject.currentPercentage}%`}
+            </span>
             <span className="text-[11px] text-slate-400 font-medium">Cutoff: 75%</span>
           </div>
           
@@ -141,14 +158,14 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
             {/* Fill bar */}
             <div
               className={`h-full rounded-full transition-all duration-500 ease-out ${theme.barColor}`}
-              style={{ width: `${currentPct}%` }}
+              style={{ width: isPending ? '0%' : `${currentPct}%` }}
             />
           </div>
         </div>
 
         {/* Timetable Numbers Breakdown */}
         {subject.tPast !== undefined && subject.tFuture !== undefined && (
-          <div className="grid grid-cols-3 gap-1 bg-slate-50 border border-slate-100 rounded-xl p-2 text-center text-[11px] mb-3">
+          <div className="grid grid-cols-4 gap-1 bg-slate-50 border border-slate-100 rounded-xl p-2 text-center text-[11px] mb-3">
             <div>
               <span className="block text-slate-400 text-[10px]">Held</span>
               <strong className="text-slate-800 font-bold">{subject.tPast}</strong>
@@ -158,8 +175,18 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
               <strong className="text-slate-800 font-bold">{subject.tFuture}</strong>
             </div>
             <div>
-              <span className="block text-slate-400 text-[10px]">Total</span>
-              <strong className="text-slate-800 font-bold">{subject.tTotal}</strong>
+              <span className="block text-slate-400 text-[10px]">Must Attend</span>
+              <strong className={`font-black ${
+                isPending ? 'text-slate-400' : (subject.requiredClassesToAttend > 0 ? 'text-amber-600' : 'text-emerald-600')
+              }`}>
+                {isPending ? '--' : subject.requiredClassesToAttend}
+              </strong>
+            </div>
+            <div>
+              <span className="block text-slate-400 text-[10px]">Can Bunk</span>
+              <strong className={`font-black ${isPending ? 'text-slate-400' : 'text-emerald-600'}`}>
+                {isPending ? '--' : (subject.bunkableClasses || 0)}
+              </strong>
             </div>
           </div>
         )}
@@ -167,7 +194,10 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({ subject }) => {
 
       {/* Requirement message box */}
       <div className={`rounded-xl p-3 text-xs font-medium leading-relaxed ${theme.bannerBg}`}>
-        {subject.statusText}
+        {isPending
+          ? '💡 Enter your attendance percentage above to instantly predict safe bunk limit & timetable streak.'
+          : subject.statusText
+        }
       </div>
     </div>
   );

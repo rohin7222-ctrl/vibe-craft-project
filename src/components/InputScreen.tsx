@@ -42,15 +42,33 @@ export const InputScreen: React.FC<InputScreenProps> = ({
   };
 
   const handlePercentageChange = (id: string, value: string) => {
+    if (value === '') {
+      setSubjects(prev =>
+        prev.map(sub => (sub.id === id ? { ...sub, currentPercentage: 0, isEntered: false } : sub))
+      );
+      return;
+    }
     const num = Math.min(100, Math.max(0, Number(value) || 0));
     setSubjects(prev =>
-      prev.map(sub => (sub.id === id ? { ...sub, currentPercentage: num } : sub))
+      prev.map(sub => (sub.id === id ? { ...sub, currentPercentage: num, isEntered: true } : sub))
     );
   };
 
   const setPresetPercentage = (id: string, pct: number) => {
     setSubjects(prev =>
-      prev.map(sub => (sub.id === id ? { ...sub, currentPercentage: pct } : sub))
+      prev.map(sub => (sub.id === id ? { ...sub, currentPercentage: pct, isEntered: true } : sub))
+    );
+  };
+
+  const handleFillAll = (pct: number) => {
+    setSubjects(prev =>
+      prev.map(sub => ({ ...sub, currentPercentage: pct, isEntered: true }))
+    );
+  };
+
+  const handleClearAll = () => {
+    setSubjects(prev =>
+      prev.map(sub => ({ ...sub, currentPercentage: 0, isEntered: false }))
     );
   };
 
@@ -59,7 +77,8 @@ export const InputScreen: React.FC<InputScreenProps> = ({
     const newSubject: SubjectInput = {
       id: `subj-${Date.now()}`,
       name: `Elective ${nextIndex}`,
-      currentPercentage: 75,
+      currentPercentage: 0,
+      isEntered: false,
     };
     setSubjects(prev => [...prev, newSubject]);
   };
@@ -134,35 +153,76 @@ export const InputScreen: React.FC<InputScreenProps> = ({
 
         {/* Subjects List */}
         <div className="pt-1">
-          <div className="flex items-center justify-between mb-2.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
             <div className="flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-blue-600" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                Subjects &amp; Current Attendance
+                Courses &amp; Current Attendance
               </span>
               <span className="text-xs text-slate-400 font-semibold">({subjects.length})</span>
             </div>
-            <button
-              type="button"
-              onClick={handleAddSubject}
-              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Course
-            </button>
+            
+            {/* Quick Batch Presets Toolbar */}
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 mr-1">Fill all:</span>
+              <button
+                type="button"
+                onClick={() => handleFillAll(75)}
+                className="text-[10px] font-black px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                title="Fill all subjects with 75% cutoff"
+              >
+                75%
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillAll(85)}
+                className="text-[10px] font-black px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                title="Fill all subjects with 85% safe zone"
+              >
+                85%
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFillAll(90)}
+                className="text-[10px] font-black px-2 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                title="Fill all subjects with 90% distinction"
+              >
+                90%
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="text-[10px] font-black px-2 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                title="Clear all inputs to calculate from blank"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleAddSubject}
+                className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors cursor-pointer ml-1"
+              >
+                <Plus className="w-3 h-3" />
+                Add
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
             {subjects.map((subj, index) => {
-              const isSafe = subj.currentPercentage >= 75;
+              const isEntered = subj.isEntered === true;
+              const isSafe = isEntered && subj.currentPercentage >= 75;
+              const isRisk = isEntered && subj.currentPercentage < 75;
 
               return (
                 <div
                   key={subj.id}
                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl border transition-all ${
-                    isSafe
-                      ? 'bg-slate-50/60 border-slate-200/80 hover:border-emerald-300'
-                      : 'bg-red-50/20 border-red-200/70 hover:border-red-300'
+                    !isEntered
+                      ? 'bg-slate-50/50 border-slate-200/80 hover:border-blue-300'
+                      : isSafe
+                        ? 'bg-emerald-50/30 border-emerald-200/80 hover:border-emerald-300'
+                        : 'bg-red-50/30 border-red-200/80 hover:border-red-300'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -179,13 +239,13 @@ export const InputScreen: React.FC<InputScreenProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
-                    {/* Quick percentage helper presets */}
+                    {/* Quick percentage helper presets for this row */}
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
                         onClick={() => setPresetPercentage(subj.id, 65)}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
-                          subj.currentPercentage === 65 ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                          isEntered && subj.currentPercentage === 65 ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                         title="Set to 65% (Risk)"
                       >
@@ -194,8 +254,8 @@ export const InputScreen: React.FC<InputScreenProps> = ({
                       <button
                         type="button"
                         onClick={() => setPresetPercentage(subj.id, 75)}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
-                          subj.currentPercentage === 75 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                          isEntered && subj.currentPercentage === 75 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                         title="Set to 75% (Target)"
                       >
@@ -204,8 +264,8 @@ export const InputScreen: React.FC<InputScreenProps> = ({
                       <button
                         type="button"
                         onClick={() => setPresetPercentage(subj.id, 85)}
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer ${
-                          subj.currentPercentage === 85 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                          isEntered && subj.currentPercentage === 85 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                         title="Set to 85% (Safe)"
                       >
@@ -219,13 +279,15 @@ export const InputScreen: React.FC<InputScreenProps> = ({
                         type="number"
                         min="0"
                         max="100"
-                        value={subj.currentPercentage === 0 ? '' : subj.currentPercentage}
+                        value={isEntered ? subj.currentPercentage : ''}
                         onChange={e => handlePercentageChange(subj.id, e.target.value)}
                         placeholder="%"
                         className={`w-full bg-white border rounded-xl pl-2.5 pr-6 py-1.5 text-xs sm:text-sm font-extrabold focus:outline-none transition-all text-right ${
-                          isSafe
-                            ? 'border-slate-200 text-emerald-700 focus:border-emerald-500'
-                            : 'border-red-200 text-red-700 focus:border-red-500'
+                          !isEntered
+                            ? 'border-slate-200 text-slate-700 placeholder-slate-300 focus:border-blue-500'
+                            : isSafe
+                              ? 'border-emerald-300 text-emerald-700 focus:border-emerald-500'
+                              : 'border-red-300 text-red-700 focus:border-red-500'
                         }`}
                       />
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">
