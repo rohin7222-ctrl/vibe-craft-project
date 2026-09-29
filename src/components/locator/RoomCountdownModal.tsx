@@ -31,6 +31,8 @@ import {
   getTotalFreePeriods,
   getPeriodEndTime
 } from '@/data/roomData';
+import { BookingRecord, PURPOSE_PRESETS } from './accept_booking';
+import { Ticket, User, BookOpen, RotateCcw } from 'lucide-react';
 
 interface RoomCountdownModalProps {
   room: RoomSchedule | null;
@@ -38,6 +40,9 @@ interface RoomCountdownModalProps {
   selectedPeriod: number;
   onClose: () => void;
   onInspectSchedule?: (room: RoomSchedule) => void;
+  existingBooking?: BookingRecord | null;
+  onBookRoom?: (booking: BookingRecord) => void;
+  onReleaseBooking?: () => void;
 }
 
 export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
@@ -46,15 +51,28 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
   selectedPeriod,
   onClose,
   onInspectSchedule,
+  existingBooking,
+  onBookRoom,
+  onReleaseBooking,
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedPass, setCopiedPass] = useState<boolean>(false);
   const [countdownStr, setCountdownStr] = useState<string>('00:00:00');
   const [percentLeft, setPercentLeft] = useState<number>(100);
   const [isWindowExpired, setIsWindowExpired] = useState<boolean>(false);
 
+  // Booking Form State
+  const [studentName, setStudentName] = useState<string>('');
+  const [department, setDepartment] = useState<string>('ECE / Computer Science');
+  const [purpose, setPurpose] = useState<string>(PURPOSE_PRESETS[0]);
+  const [customPurpose, setCustomPurpose] = useState<string>('');
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState<boolean>(false);
+
   const periodIndex = selectedPeriod - 1;
   const schedule = room ? (room.occupied[selectedDay] || []) : [];
-  const isFree = room ? (schedule[periodIndex] ?? 1) === 0 : false;
+  const isBookedByUser = !!existingBooking;
+  // If booked by user, it is OCCUPIED!
+  const isFree = room ? ((schedule[periodIndex] ?? 1) === 0 && !isBookedByUser) : false;
 
   // Calculate consecutive free periods from currently selected period
   const consecutiveFree = (room && isFree) ? getConsecutiveFreePeriods(room, selectedDay, periodIndex) : 0;
@@ -167,7 +185,12 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
                 </span>
               )}
 
-              {isFree ? (
+              {isBookedByUser ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-black uppercase tracking-wider shadow-sm ring-2 ring-rose-300">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                  OCCUPIED (YOUR BOOKING)
+                </span>
+              ) : isFree ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-xs font-black uppercase tracking-wider shadow-sm">
                   <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
                   AVAILABLE NOW
@@ -202,7 +225,84 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
         {/* Modal Scrollable Body */}
         <div className="p-5 sm:p-6 overflow-y-auto space-y-6">
           {/* ======================================================== */}
-          {/* 1. LIVE COUNTDOWN TIMER BLOCK */}
+          {/* 1. BOOKING PASS (IF BOOKED BY YOU)                      */}
+          {/* ======================================================== */}
+          {isBookedByUser && existingBooking ? (
+            <div className="space-y-3 animate-in fade-in zoom-in-95 duration-200">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-slate-900 to-rose-950 text-white p-5 sm:p-6 border border-rose-500/40 shadow-xl">
+                <div className="flex items-start justify-between gap-4 pb-3 border-b border-white/10">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-400 flex items-center gap-1.5">
+                      <Ticket className="w-3.5 h-3.5" />
+                      YOUR ACTIVE CLASSROOM RESERVATION
+                    </span>
+                    <h4 className="text-2xl font-black text-white mt-1">{existingBooking.roomName}</h4>
+                    <p className="text-xs text-slate-300">
+                      {existingBooking.floor} &bull; {selectedDay} Period {selectedPeriod} ({PERIOD_TIMINGS[periodIndex].timeRange})
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block font-mono">PASS REF #</span>
+                    <span className="text-base font-black text-rose-300 font-mono tracking-wider">
+                      {existingBooking.id}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 py-3 border-b border-white/10 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Lead Student</span>
+                    <span className="font-bold text-white text-sm">{existingBooking.studentName}</span>
+                    <span className="text-[11px] text-slate-300 block">{existingBooking.department}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase">Purpose</span>
+                    <span className="font-bold text-rose-200 text-xs leading-snug block">
+                      {existingBooking.purpose}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      Booked at {existingBooking.timestamp}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    <span>Status: OCCUPIED (Marked on Maps)</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const passText = `🎟️ *VibeCraft Room Pass: ${existingBooking.id}*\n📍 *Room:* ${existingBooking.roomName} (${existingBooking.floor})\n📅 *Time:* ${selectedDay} Period ${selectedPeriod} (${PERIOD_TIMINGS[periodIndex].timeRange})\n👤 *Student:* ${existingBooking.studentName}\n🎯 *Purpose:* ${existingBooking.purpose}\nStatus: OCCUPIED`;
+                        navigator.clipboard?.writeText(passText);
+                        setCopiedPass(true);
+                        setTimeout(() => setCopiedPass(false), 2000);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer"
+                    >
+                      {copiedPass ? 'Copied!' : 'Copy Pass'}
+                    </button>
+                    {onReleaseBooking && (
+                      <button
+                        type="button"
+                        onClick={onReleaseBooking}
+                        className="px-3.5 py-1.5 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Cancel Booking</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ======================================================== */}
+          {/* 2. LIVE COUNTDOWN TIMER BLOCK (IF FREE)                 */}
           {/* ======================================================== */}
           {isFree ? (
             <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 p-6 text-white shadow-xl border border-emerald-500/30 relative overflow-hidden">
@@ -248,7 +348,7 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
                 </div>
               </div>
             </div>
-          ) : (
+          ) : !isBookedByUser ? (
             <div className="rounded-3xl bg-rose-50 border border-rose-200 p-5 text-rose-950 flex items-start gap-3.5">
               <AlertCircle className="w-6 h-6 text-rose-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -260,6 +360,122 @@ export const RoomCountdownModal: React.FC<RoomCountdownModalProps> = ({
                     ? `This classroom is scheduled for a class during Period ${selectedPeriod}. It will next become free at Period ${nextFreePeriodIndex + 1} (${PERIOD_TIMINGS[nextFreePeriodIndex].startTime} AM/PM).`
                     : 'This room is occupied for all remaining periods on ' + selectedDay + '.'}
                 </p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ======================================================== */}
+          {/* 3. ACCEPT BOOKING FORM (IF ROOM IS FREE & NOT YET BOOKED)*/}
+          {/* ======================================================== */}
+          {isFree && onBookRoom && (
+            <div className="rounded-3xl bg-white border border-emerald-300/80 shadow-lg shadow-emerald-500/10 p-5 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-md shadow-emerald-500/25">
+                    <Ticket className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm sm:text-base font-black text-slate-900">
+                      ⚡ Accept Booking &bull; Reserve Classroom
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Booking will instantly mark this room as <strong>OCCUPIED</strong> across campus maps.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Free to Reserve
+                </span>
+              </div>
+
+              <div className="space-y-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-emerald-600" />
+                      Student Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul / Sneha"
+                      value={studentName}
+                      onChange={e => setStudentName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                      <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                      Department / Section
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. IV ECE B"
+                      value={department}
+                      onChange={e => setDepartment(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    Select Purpose
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PURPOSE_PRESETS.map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setPurpose(p);
+                          setCustomPurpose('');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          purpose === p && !customPurpose
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Confirm Button */}
+                <button
+                  type="button"
+                  disabled={isBookingSubmitting || !studentName.trim()}
+                  onClick={() => {
+                    if (!studentName.trim()) return;
+                    setIsBookingSubmitting(true);
+                    setTimeout(() => {
+                      const finalPurpose = customPurpose.trim() || purpose;
+                      const newBooking: BookingRecord = {
+                        id: `VCB-${Math.floor(1000 + Math.random() * 9000)}`,
+                        roomName: room.room,
+                        floor: room.floor,
+                        isAC: room.isAC,
+                        day: selectedDay,
+                        period: selectedPeriod,
+                        timeRange: PERIOD_TIMINGS[periodIndex].timeRange,
+                        studentName: studentName.trim(),
+                        department: department.trim() || 'General Studies',
+                        purpose: finalPurpose,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      };
+                      onBookRoom(newBooking);
+                      setIsBookingSubmitting(false);
+                    }, 350);
+                  }}
+                  className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-700 hover:to-teal-700 active:scale-[0.99] text-white font-black text-sm shadow-xl shadow-emerald-500/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Accept &amp; Confirm Booking (Set Room to Occupied)</span>
+                </button>
               </div>
             </div>
           )}

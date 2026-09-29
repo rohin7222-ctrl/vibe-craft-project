@@ -24,7 +24,7 @@ interface DashboardScreenProps {
   targetDate: string;
   totalClassesRemaining: number;
   subjects: SubjectPrediction[];
-  onGoBack: () => void;
+  onGoBack?: () => void;
   simulation: SimulationSettings;
   setSimulation: React.Dispatch<React.SetStateAction<SimulationSettings>>;
 }
@@ -245,11 +245,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <div className="pt-2">
             <button
               type="button"
-              onClick={onGoBack}
-              className="w-full border border-blue-200 hover:border-blue-400 bg-white hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-6 rounded-2xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
+              onClick={() => {
+                if (onGoBack) onGoBack();
+                else window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="w-full border border-blue-200/90 hover:border-blue-400 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 hover:bg-blue-50 text-slate-800 font-bold py-3.5 px-6 rounded-2xl transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-[0.99]"
             >
               <ArrowLeft className="w-4 h-4 text-blue-600" />
-              <span>Modify Details / Recalculate</span>
+              <span>Modify Details &amp; Attendance Percentages (Scroll to Top)</span>
             </button>
           </div>
         </div>

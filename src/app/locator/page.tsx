@@ -9,6 +9,7 @@ import {
   getCurrentDayOfWeek 
 } from '@/data/roomData';
 import { LocatorHeader } from '@/components/locator/LocatorHeader';
+import { TopBookingBar } from '@/components/locator/TopBookingBar';
 import { FreeRoomsShowcase } from '@/components/locator/FreeRoomsShowcase';
 import { QuickRecommendation } from '@/components/locator/QuickRecommendation';
 import { AIRoomScout } from '@/components/locator/AIRoomScout';
@@ -22,12 +23,34 @@ import { RoomDetailModal } from '@/components/locator/RoomDetailModal';
 import { VisualBuildingMap } from '@/components/locator/VisualBuildingMap';
 import { RoomCountdownModal } from '@/components/locator/RoomCountdownModal';
 import { ScheduleInspectorModal } from '@/components/locator/ScheduleInspectorModal';
+import { BookingRecord, AcceptBookingModal } from '@/components/locator/accept_booking';
 import { SearchX } from 'lucide-react';
 
 export default function FreeClassLocatorPage() {
   // State initialization: defaults to today and current live period
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayOfWeek());
   const [selectedPeriod, setSelectedPeriod] = useState<number>(() => getCurrentPeriodFromTime());
+
+  // Dynamic Room Data & Bookings State (Persisted in localStorage)
+  const [roomsData, setRoomsData] = useState<RoomSchedule[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('vibecraft_rooms_data');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return ROOM_DATA;
+  });
+
+  const [bookings, setBookings] = useState<Record<string, BookingRecord>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('vibecraft_bookings');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -41,17 +64,99 @@ export default function FreeClassLocatorPage() {
   const [selectedRoomModal, setSelectedRoomModal] = useState<RoomSchedule | null>(null);
   const [scheduleInspectRoom, setScheduleInspectRoom] = useState<RoomSchedule | null>(null);
 
+  // Booking handlers: marks room as OCCUPIED
+  const handleConfirmBooking = (booking: BookingRecord) => {
+    const bookingKey = `${booking.roomName}_${booking.day}_${booking.period}`;
+    const pIdx = booking.period - 1;
+
+    setRoomsData(prevRooms => {
+      const updated = prevRooms.map(r => {
+        if (r.room === booking.roomName) {
+          const newOccupied = { ...r.occupied };
+          const daySchedule = [...(newOccupied[booking.day] || [0, 0, 0, 0, 0, 0, 0, 0, 0])];
+          daySchedule[pIdx] = 1; // Mark room as OCCUPIED!
+          newOccupied[booking.day] = daySchedule;
+          return { ...r, occupied: newOccupied };
+        }
+        return r;
+      });
+      try {
+        localStorage.setItem('vibecraft_rooms_data', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setBookings(prev => {
+      const updated = { ...prev, [bookingKey]: booking };
+      try {
+        localStorage.setItem('vibecraft_bookings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setSelectedRoomModal(prev => {
+      if (!prev || prev.room !== booking.roomName) return prev;
+      const newOccupied = { ...prev.occupied };
+      const daySchedule = [...(newOccupied[booking.day] || [0, 0, 0, 0, 0, 0, 0, 0, 0])];
+      daySchedule[pIdx] = 1;
+      newOccupied[booking.day] = daySchedule;
+      return { ...prev, occupied: newOccupied };
+    });
+  };
+
+  const handleCancelBooking = (roomName: string, day: DayOfWeek, period: number) => {
+    const bookingKey = `${roomName}_${day}_${period}`;
+    const pIdx = period - 1;
+    const origRoom = ROOM_DATA.find(r => r.room === roomName);
+    const origStatus = origRoom?.occupied[day]?.[pIdx] ?? 0;
+
+    setRoomsData(prevRooms => {
+      const updated = prevRooms.map(r => {
+        if (r.room === roomName) {
+          const newOccupied = { ...r.occupied };
+          const daySchedule = [...(newOccupied[day] || [0, 0, 0, 0, 0, 0, 0, 0, 0])];
+          daySchedule[pIdx] = origStatus; // Revert to original
+          newOccupied[day] = daySchedule;
+          return { ...r, occupied: newOccupied };
+        }
+        return r;
+      });
+      try {
+        localStorage.setItem('vibecraft_rooms_data', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setBookings(prev => {
+      const updated = { ...prev };
+      delete updated[bookingKey];
+      try {
+        localStorage.setItem('vibecraft_bookings', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setSelectedRoomModal(prev => {
+      if (!prev || prev.room !== roomName) return prev;
+      const newOccupied = { ...prev.occupied };
+      const daySchedule = [...(newOccupied[day] || [0, 0, 0, 0, 0, 0, 0, 0, 0])];
+      daySchedule[pIdx] = origStatus;
+      newOccupied[day] = daySchedule;
+      return { ...prev, occupied: newOccupied };
+    });
+  };
+
   // Available unique floors
   const availableFloors = useMemo(() => {
-    const floorSet = new Set(ROOM_DATA.map(r => r.floor));
+    const floorSet = new Set(roomsData.map(r => r.floor));
     return Array.from(floorSet);
-  }, []);
+  }, [roomsData]);
 
   // Filtered rooms logic
   const filteredRooms = useMemo(() => {
     const periodIndex = selectedPeriod - 1;
 
-    return ROOM_DATA.filter(room => {
+    return roomsData.filter(room => {
       const isRoomFree = (room.occupied[selectedDay]?.[periodIndex] ?? 1) === 0;
 
       // 0. Only Free shortcut filter
@@ -78,7 +183,7 @@ export default function FreeClassLocatorPage() {
 
       return true;
     });
-  }, [selectedDay, selectedPeriod, searchQuery, statusFilter, acFilter, floorFilter, onlyFreeFilter]);
+  }, [roomsData, selectedDay, selectedPeriod, searchQuery, statusFilter, acFilter, floorFilter, onlyFreeFilter]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 relative selection:bg-emerald-600 selection:text-white pb-24">
@@ -96,9 +201,18 @@ export default function FreeClassLocatorPage() {
         {/* 1. Header with live clock & cross-route navigation */}
         <LocatorHeader selectedDay={selectedDay} selectedPeriod={selectedPeriod} />
 
-        {/* 2. Free Rooms Live Showcase: Big Vacant Rooms Banner with 1-click Free filter */}
+        {/* 2. Top Booking Bar (Period and Date selection brought right to the TOP!) */}
+        <TopBookingBar
+          selectedDay={selectedDay}
+          setSelectedDay={setSelectedDay}
+          selectedPeriod={selectedPeriod}
+          setSelectedPeriod={setSelectedPeriod}
+          rooms={roomsData}
+        />
+
+        {/* 3. Free Rooms Live Showcase: Big Vacant Rooms Banner with 1-click Free filter */}
         <FreeRoomsShowcase
-          rooms={ROOM_DATA}
+          rooms={roomsData}
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
           onlyFreeFilter={onlyFreeFilter}
@@ -108,7 +222,7 @@ export default function FreeClassLocatorPage() {
 
         {/* 3. Instant AI Smart Recommendation Spotlight */}
         <QuickRecommendation
-          rooms={ROOM_DATA}
+          rooms={roomsData}
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
           onSelectRoom={setSelectedRoomModal}
@@ -122,7 +236,7 @@ export default function FreeClassLocatorPage() {
 
         {/* 5. Real-time Status KPI Summary Cards */}
         <LocatorStats
-          rooms={ROOM_DATA}
+          rooms={roomsData}
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
         />
@@ -217,7 +331,7 @@ export default function FreeClassLocatorPage() {
         )}
       </div>
 
-      {/* 8. Live Countdown & Squad Share Modal */}
+      {/* 8. Live Countdown, Squad Share & Accept Booking Modal */}
       {selectedRoomModal && (
         <RoomCountdownModal
           room={selectedRoomModal}
@@ -225,6 +339,9 @@ export default function FreeClassLocatorPage() {
           selectedPeriod={selectedPeriod}
           onClose={() => setSelectedRoomModal(null)}
           onInspectSchedule={setScheduleInspectRoom}
+          existingBooking={bookings[`${selectedRoomModal.room}_${selectedDay}_${selectedPeriod}`] || null}
+          onBookRoom={handleConfirmBooking}
+          onReleaseBooking={() => handleCancelBooking(selectedRoomModal.room, selectedDay, selectedPeriod)}
         />
       )}
 
@@ -234,6 +351,10 @@ export default function FreeClassLocatorPage() {
           room={scheduleInspectRoom}
           initialDay={selectedDay}
           onClose={() => setScheduleInspectRoom(null)}
+          onSelectBooking={(room) => {
+            setScheduleInspectRoom(null);
+            setSelectedRoomModal(room);
+          }}
         />
       )}
     </div>

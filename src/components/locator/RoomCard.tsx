@@ -204,16 +204,29 @@ export const RoomCard: React.FC<RoomCardProps> = ({
         </div>
       </div>
 
-      {/* Footer CTA: Inspect Details */}
+      {/* Footer CTA: Inspect & Book Details */}
       <div className="pt-3 mt-2">
         <button
           type="button"
           onClick={() => onOpenDetails(room)}
-          className="w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-2xl bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 text-xs font-bold border border-slate-200/80 hover:border-emerald-200 transition-all cursor-pointer"
+          className={`w-full inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-2xl text-xs font-black border transition-all cursor-pointer ${
+            isFree
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-emerald-600 shadow-md shadow-emerald-500/20'
+              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/90'
+          }`}
         >
-          <CalendarCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Full 5-Day Timetable</span>
-          <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400 group-hover:text-emerald-600" />
+          {isFree ? (
+            <>
+              <Zap className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+              <span>⚡ Inspect &amp; Book Classroom</span>
+            </>
+          ) : (
+            <>
+              <CalendarCheck className="w-3.5 h-3.5 text-slate-500" />
+              <span>Inspect Room Schedule</span>
+            </>
+          )}
+          <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-80" />
         </button>
       </div>
     </div>

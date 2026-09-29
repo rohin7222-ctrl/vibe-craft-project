@@ -37,12 +37,14 @@ interface ScheduleInspectorModalProps {
   room: RoomSchedule | null;
   initialDay?: DayOfWeek;
   onClose: () => void;
+  onSelectBooking?: (room: RoomSchedule) => void;
 }
 
 export const ScheduleInspectorModal: React.FC<ScheduleInspectorModalProps> = ({
   room,
   initialDay,
   onClose,
+  onSelectBooking,
 }) => {
   const [activeDay, setActiveDay] = useState<DayOfWeek>(() => initialDay || getCurrentDayOfWeek());
   const [activeView, setActiveView] = useState<'timeline' | 'matrix'>('timeline');
@@ -561,6 +563,18 @@ _Sent via Free Class Locator_`;
                 </>
               )}
             </button>
+
+            {/* Book Classroom Button */}
+            {onSelectBooking && (
+              <button
+                type="button"
+                onClick={() => onSelectBooking(room)}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all cursor-pointer shadow-md active:scale-98"
+              >
+                <Zap className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Book This Room</span>
+              </button>
+            )}
 
             {/* WhatsApp Squad Share */}
             <a

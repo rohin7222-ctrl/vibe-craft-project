@@ -7,7 +7,7 @@ import {
   SEMESTER_END_DATE 
 } from '@/utils/attendanceCalculator';
 import { TIMETABLE_DATA } from '@/data/timetableData';
-import { InputScreen } from '@/components/InputScreen';
+import { AttendanceConfigCard } from '@/components/AttendanceConfigCard';
 import { DashboardScreen } from '@/components/DashboardScreen';
 import { BrandHero } from '@/components/BrandHero';
 import { ChatbotWidget } from '@/components/ChatbotWidget';
@@ -35,8 +35,6 @@ export default function Home() {
   );
   const [predictions, setPredictions] = useState<SubjectPrediction[]>([]);
   const [totalClassesRemaining, setTotalClassesRemaining] = useState<number>(45);
-  const [isPredicting, setIsPredicting] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'split' | 'dashboard' | 'input'>('split');
 
   // Leave & OD Simulator State
   const [simulation, setSimulation] = useState<SimulationSettings>({
@@ -107,77 +105,6 @@ export default function Home() {
     runCalculations(section, targetDate, subjects, simulation);
   }, [runCalculations, section, targetDate, subjects, simulation]);
 
-  /**
-   * Predict handler - Calls /api/predict or updates local model
-   */
-  const handlePredict = async () => {
-    setIsPredicting(true);
-
-    try {
-      const userPercentages: Record<string, number> = {};
-      subjects.forEach(s => { 
-        if (s.isEntered) {
-          userPercentages[s.name] = s.currentPercentage; 
-        }
-      });
-
-      const response = await fetch('/api/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          section,
-          targetDate,
-          userPercentages,
-          targetPercentage: 75,
-          simulation,
-        }),
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        const data = json.data;
-        const formatted: SubjectPrediction[] = data.subjects.map((m: any) => ({
-          id: m.id,
-          name: m.name,
-          currentPercentage: m.currentPercentage,
-          targetPercentage: m.targetPercentage,
-          remainingClasses: m.tFuture,
-          requiredClassesToAttend: m.requiredClassesToAttend,
-          status: m.status,
-          statusText: m.statusText,
-          isIrreversibleDetention: m.isIrreversibleDetention,
-          maxAchievablePercentage: m.maxAchievablePercentage,
-          iconType: m.iconType,
-          tPast: m.tPast,
-          tFuture: m.tFuture,
-          tTotal: m.tTotal,
-          bunkableClasses: m.bunkableClasses,
-          odCredit: m.odCredit,
-          sickDeduction: m.sickDeduction,
-          consecutiveClassesNeeded: m.consecutiveClassesNeeded,
-          immediateBunkableClasses: m.immediateBunkableClasses,
-          isEntered: m.isEntered,
-        }));
-        setPredictions(formatted);
-        setTotalClassesRemaining(data.totalClassesRemainingSemester);
-      } else {
-        runCalculations(section, targetDate, subjects, simulation);
-      }
-    } catch {
-      runCalculations(section, targetDate, subjects, simulation);
-    } finally {
-      setIsPredicting(false);
-      // On mobile screens, automatically show the dashboard tab on calculate
-      if (window.innerWidth < 1024) {
-        setViewMode('dashboard');
-      }
-    }
-  };
-
-  const handleGoBack = () => {
-    setViewMode('input');
-  };
-
   const sectionDisplayName = section.replace(/_/g, ' ');
 
   return (
@@ -195,79 +122,33 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Header & Navbar */}
         <BrandHero 
-          viewMode={viewMode} 
-          setViewMode={setViewMode} 
           sectionDisplayName={sectionDisplayName} 
         />
 
         {/* ======================================================== */}
-        {/* 1. SPLIT VIEW (Desktop Side-by-Side: Input on Left, Dashboard on Right) */}
+        {/* UNIFIED DASHBOARD VIEW ONLY (Slide/Split view removed)    */}
         {/* ======================================================== */}
-        {viewMode === 'split' && (
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Left Column: Form */}
-            <div className="lg:col-span-5">
-              <InputScreen
-                section={section}
-                setSection={handleSectionChange}
-                targetDate={targetDate}
-                setTargetDate={setTargetDate}
-                subjects={subjects}
-                setSubjects={setSubjects}
-                onPredict={handlePredict}
-                isPredicting={isPredicting}
-              />
-            </div>
+        <div className="mt-4 space-y-6">
+          {/* Top Attendance Configuration & Quick Percentage Inputs */}
+          <AttendanceConfigCard
+            section={section}
+            setSection={handleSectionChange}
+            targetDate={targetDate}
+            setTargetDate={setTargetDate}
+            subjects={subjects}
+            setSubjects={setSubjects}
+          />
 
-            {/* Right Column: Live Dashboard */}
-            <div className="lg:col-span-7">
-              <DashboardScreen
-                section={sectionDisplayName}
-                targetDate={targetDate}
-                totalClassesRemaining={totalClassesRemaining}
-                subjects={predictions}
-                onGoBack={handleGoBack}
-                simulation={simulation}
-                setSimulation={setSimulation}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* 2. FULL DASHBOARD VIEW (Spacious, Complete Insights) */}
-        {/* ======================================================== */}
-        {viewMode === 'dashboard' && (
-          <div className="mt-4 max-w-5xl mx-auto">
-            <DashboardScreen
-              section={sectionDisplayName}
-              targetDate={targetDate}
-              totalClassesRemaining={totalClassesRemaining}
-              subjects={predictions}
-              onGoBack={handleGoBack}
-              simulation={simulation}
-              setSimulation={setSimulation}
-            />
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* 3. FOCUSED INPUT VIEW (For mobile or quick form filling) */}
-        {/* ======================================================== */}
-        {viewMode === 'input' && (
-          <div className="mt-4 max-w-xl mx-auto">
-            <InputScreen
-              section={section}
-              setSection={handleSectionChange}
-              targetDate={targetDate}
-              setTargetDate={setTargetDate}
-              subjects={subjects}
-              setSubjects={setSubjects}
-              onPredict={handlePredict}
-              isPredicting={isPredicting}
-            />
-          </div>
-        )}
+          {/* Complete Live Dashboard Screen */}
+          <DashboardScreen
+            section={sectionDisplayName}
+            targetDate={targetDate}
+            totalClassesRemaining={totalClassesRemaining}
+            subjects={predictions}
+            simulation={simulation}
+            setSimulation={setSimulation}
+          />
+        </div>
       </div>
 
       {/* Floating Return to Room Booking Page Button */}
