@@ -17,7 +17,8 @@ import {
   PERIOD_TIMINGS, 
   getCurrentPeriodFromTime, 
   getCurrentDayOfWeek,
-  ROOM_DATA
+  ROOM_DATA,
+  RoomSchedule
 } from '@/data/roomData';
 
 interface TopBookingBarProps {
