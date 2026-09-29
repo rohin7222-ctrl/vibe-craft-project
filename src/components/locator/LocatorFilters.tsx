@@ -34,6 +34,8 @@ interface LocatorFiltersProps {
   setSelectedDay?: (day: DayOfWeek) => void;
   selectedPeriod?: number;
   setSelectedPeriod?: (p: number) => void;
+  onlyFreeFilter?: boolean;
+  setOnlyFreeFilter?: (val: boolean) => void;
 }
 
 export const LocatorFilters: React.FC<LocatorFiltersProps> = ({
@@ -48,12 +50,15 @@ export const LocatorFilters: React.FC<LocatorFiltersProps> = ({
   viewMode,
   setViewMode,
   availableFloors,
+  onlyFreeFilter = false,
+  setOnlyFreeFilter,
 }) => {
   const handleResetFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
     setAcFilter('all');
     setFloorFilter('all');
+    if (setOnlyFreeFilter) setOnlyFreeFilter(false);
   };
 
   return (
@@ -86,6 +91,27 @@ export const LocatorFilters: React.FC<LocatorFiltersProps> = ({
 
         {/* Filter Controls Row */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Quick 1-Click Show ONLY Free Rooms Button */}
+          {setOnlyFreeFilter && (
+            <button
+              type="button"
+              onClick={() => setOnlyFreeFilter(!onlyFreeFilter)}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold rounded-2xl border transition-all cursor-pointer shadow-2xs whitespace-nowrap ${
+                onlyFreeFilter
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-md shadow-emerald-500/25 ring-2 ring-emerald-500/20'
+                  : 'bg-emerald-50/90 hover:bg-emerald-100 text-emerald-800 border-emerald-200/90'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>{onlyFreeFilter ? 'Showing ONLY Free Rooms' : 'Filter: Show ONLY Free Rooms'}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-black ${
+                onlyFreeFilter ? 'bg-slate-900 text-white' : 'bg-emerald-200/80 text-emerald-900'
+              }`}>
+                {onlyFreeFilter ? 'ON' : 'OFF'}
+              </span>
+            </button>
+          )}
+
           {/* Status Filter */}
           <select
             value={statusFilter}

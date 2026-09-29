@@ -18,8 +18,8 @@ interface FreeRoomsShowcaseProps {
   rooms: RoomSchedule[];
   selectedDay: DayOfWeek;
   selectedPeriod: number;
-  onlyFreeFilter: boolean;
-  setOnlyFreeFilter: (val: boolean) => void;
+  onlyFreeFilter?: boolean;
+  setOnlyFreeFilter?: (val: boolean) => void;
   onSelectRoom: (room: RoomSchedule) => void;
 }
 
@@ -27,8 +27,6 @@ export const FreeRoomsShowcase: React.FC<FreeRoomsShowcaseProps> = ({
   rooms,
   selectedDay,
   selectedPeriod,
-  onlyFreeFilter,
-  setOnlyFreeFilter,
   onSelectRoom,
 }) => {
   const periodIndex = selectedPeriod - 1;
@@ -94,23 +92,13 @@ export const FreeRoomsShowcase: React.FC<FreeRoomsShowcaseProps> = ({
           </p>
         </div>
 
-        {/* 1-Click Filter: Only Show Free Rooms */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setOnlyFreeFilter(!onlyFreeFilter)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md ${
-              onlyFreeFilter
-                ? 'bg-emerald-500 text-slate-950 ring-2 ring-emerald-300 font-black'
-                : 'bg-white/10 hover:bg-white/15 text-white border border-white/20'
-            }`}
-          >
-            <Filter className="w-4 h-4 text-emerald-300" />
-            <span>{onlyFreeFilter ? 'Showing ONLY Free Rooms' : 'Filter: Show ONLY Free Rooms'}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${onlyFreeFilter ? 'bg-slate-900 text-white' : 'bg-emerald-400/20 text-emerald-300'}`}>
-              {freeRooms.length}
-            </span>
-          </button>
+        {/* Live Availability Status Chip */}
+        <div className="flex items-center gap-2.5 flex-shrink-0">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 border border-white/15 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>{freeRooms.length} Rooms Available</span>
+            <span className="text-emerald-300 font-semibold">({totalACFree} AC)</span>
+          </div>
         </div>
       </div>
 

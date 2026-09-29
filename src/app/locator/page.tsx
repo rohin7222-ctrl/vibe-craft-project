@@ -210,17 +210,15 @@ export default function FreeClassLocatorPage() {
           rooms={roomsData}
         />
 
-        {/* 3. Free Rooms Live Showcase: Big Vacant Rooms Banner with 1-click Free filter */}
+        {/* 3. Free Rooms Live Showcase: Big Vacant Rooms Banner */}
         <FreeRoomsShowcase
           rooms={roomsData}
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
-          onlyFreeFilter={onlyFreeFilter}
-          setOnlyFreeFilter={setOnlyFreeFilter}
           onSelectRoom={setSelectedRoomModal}
         />
 
-        {/* 3. Instant AI Smart Recommendation Spotlight */}
+        {/* 4. Instant AI Smart Recommendation Spotlight */}
         <QuickRecommendation
           rooms={roomsData}
           selectedDay={selectedDay}
@@ -228,20 +226,20 @@ export default function FreeClassLocatorPage() {
           onSelectRoom={setSelectedRoomModal}
         />
 
-        {/* 4. Interactive AI Campus Room Scout: Chatbot / Instant Prompt Chips */}
+        {/* 5. Interactive AI Campus Room Scout: Chatbot / Instant Prompt Chips */}
         <AIRoomScout
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
         />
 
-        {/* 5. Real-time Status KPI Summary Cards */}
+        {/* 6. Real-time Status KPI Summary Cards */}
         <LocatorStats
           rooms={roomsData}
           selectedDay={selectedDay}
           selectedPeriod={selectedPeriod}
         />
 
-        {/* 6. Filter, Day, Period, and Search Control Panel */}
+        {/* 7. Filter, Search & Layout View Control Panel */}
         <LocatorFilters
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
@@ -258,6 +256,8 @@ export default function FreeClassLocatorPage() {
           viewMode={viewMode}
           setViewMode={setViewMode}
           availableFloors={availableFloors}
+          onlyFreeFilter={onlyFreeFilter}
+          setOnlyFreeFilter={setOnlyFreeFilter}
         />
 
         {/* 7. Main Content: Visual Floor Plan Map / Cards View / Map View / Floor View / Matrix View */}
